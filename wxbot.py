@@ -21,6 +21,8 @@ SUCCESS = '200'
 SCANED  = '201'
 TIMEOUT = '408'
 
+debug_dir = "./debug"
+
 
 def show_image(file):
     """
@@ -72,6 +74,9 @@ class WXBot:
         # 所有账户, {'group_member':{'id':{'type':'group_member', 'info':{}}, ...}, 'normal_member':{'id':{}, ...}}
         self.account_info = {'group_member': {}, 'normal_member': {}}
 
+        # 最近联系人页面，可获得未保存进通讯录的群
+        self.chat_list = []
+
         self.contact_list = []  # 联系人列表
         self.public_list = []  # 公众账号列表
         self.group_list = []  # 群聊列表
@@ -100,7 +105,7 @@ class WXBot:
         r = self.session.post(url, data='{}')
         r.encoding = 'utf-8'
         if self.DEBUG:
-            with open('data/contacts.json', 'w') as f:
+            with open(debug_dir + '/contacts.json', 'w') as f:
                 f.write(r.text.encode('utf-8'))
         dic = json.loads(r.text)
         self.member_list = dic['MemberList']
@@ -119,7 +124,7 @@ class WXBot:
         self.special_list = []
         self.group_list = []
 
-        for contact in self.member_list:
+        for contact in self.member_list + self.chat_list:
             if contact['VerifyFlag'] & 8 != 0:  # 公众号
                 self.public_list.append(contact)
                 self.account_info['normal_member'][contact['UserName']] = {'type': 'public', 'info': contact}
@@ -127,6 +132,7 @@ class WXBot:
                 self.special_list.append(contact)
                 self.account_info['normal_member'][contact['UserName']] = {'type': 'special', 'info': contact}
             elif contact['UserName'].find('@@') != -1:  # 群聊
+                if filter(lambda g:g['UserName']==contact['UserName'], self.group_list):continue
                 self.group_list.append(contact)
                 self.account_info['normal_member'][contact['UserName']] = {'type': 'group', 'info': contact}
             elif contact['UserName'] == self.my_account['UserName']:  # 自己
@@ -145,19 +151,19 @@ class WXBot:
                         {'type': 'group_member', 'info': member, 'group': group}
 
         if self.DEBUG:
-            with open('data/contact_list.json', 'w') as f:
+            with open(debug_dir + '/contact_list.json', 'w') as f:
                 f.write(json.dumps(self.contact_list))
-            with open('data/special_list.json', 'w') as f:
+            with open(debug_dir + '/special_list.json', 'w') as f:
                 f.write(json.dumps(self.special_list))
-            with open('data/group_list.json', 'w') as f:
+            with open(debug_dir + '/group_list.json', 'w') as f:
                 f.write(json.dumps(self.group_list))
-            with open('data/public_list.json', 'w') as f:
+            with open(debug_dir + '/public_list.json', 'w') as f:
                 f.write(json.dumps(self.public_list))
-            with open('data/member_list.json', 'w') as f:
+            with open(debug_dir + '/member_list.json', 'w') as f:
                 f.write(json.dumps(self.member_list))
-            with open('data/group_users.json', 'w') as f:
+            with open(debug_dir + '/group_users.json', 'w') as f:
                 f.write(json.dumps(self.group_members))
-            with open('data/account_info.json', 'w') as f:
+            with open(debug_dir + '/account_info.json', 'w') as f:
                 f.write(json.dumps(self.account_info))
         return True
 
@@ -709,6 +715,8 @@ class WXBot:
         return 'unknown'
 
     def run(self):
+        if self.DEBUG and not os.path.isdir(debug_dir):
+            os.mkdir(debug_dir)
         self.get_uuid()
         self.gen_qr_code('qr.png')
         print '[INFO] Please use WeChat to scan the QR code .'
@@ -859,6 +867,11 @@ class WXBot:
         dic = json.loads(r.text)
         self.sync_key = dic['SyncKey']
         self.my_account = dic['User']
+        self.chat_list = dic['ContactList']
+        if self.DEBUG:
+            with open(debug_dir + '/chat_list.json', 'w') as f:
+                f.write(json.dumps(self.chat_list))
+
         self.sync_key_str = '|'.join([str(keyVal['Key']) + '_' + str(keyVal['Val'])
                                       for keyVal in self.sync_key['List']])
         return dic['BaseResponse']['Ret'] == 0
