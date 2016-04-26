@@ -14,6 +14,7 @@ import re
 import random
 from requests.exceptions import ConnectionError, ReadTimeout
 import HTMLParser
+import threading
 
 UNKONWN = 'unkonwn'
 SUCCESS = '200'
@@ -99,7 +100,7 @@ class WXBot:
         r = self.session.post(url, data='{}')
         r.encoding = 'utf-8'
         if self.DEBUG:
-            with open('contacts.json', 'w') as f:
+            with open('data/contacts.json', 'w') as f:
                 f.write(r.text.encode('utf-8'))
         dic = json.loads(r.text)
         self.member_list = dic['MemberList']
@@ -144,19 +145,19 @@ class WXBot:
                         {'type': 'group_member', 'info': member, 'group': group}
 
         if self.DEBUG:
-            with open('contact_list.json', 'w') as f:
+            with open('data/contact_list.json', 'w') as f:
                 f.write(json.dumps(self.contact_list))
-            with open('special_list.json', 'w') as f:
+            with open('data/special_list.json', 'w') as f:
                 f.write(json.dumps(self.special_list))
-            with open('group_list.json', 'w') as f:
+            with open('data/group_list.json', 'w') as f:
                 f.write(json.dumps(self.group_list))
-            with open('public_list.json', 'w') as f:
+            with open('data/public_list.json', 'w') as f:
                 f.write(json.dumps(self.public_list))
-            with open('member_list.json', 'w') as f:
+            with open('data/member_list.json', 'w') as f:
                 f.write(json.dumps(self.member_list))
-            with open('group_users.json', 'w') as f:
+            with open('data/group_users.json', 'w') as f:
                 f.write(json.dumps(self.group_members))
-            with open('account_info.json', 'w') as f:
+            with open('data/account_info.json', 'w') as f:
                 f.write(json.dumps(self.account_info))
         return True
 
@@ -627,7 +628,7 @@ class WXBot:
                     pass
                 else:
                     pass
-            self.schedule()
+            threading.Thread(target=self.schedule).start()
             check_time = time.time() - check_time
             if check_time < 0.8:
                 time.sleep(1 - check_time)
@@ -731,8 +732,8 @@ class WXBot:
         self.status_notify()
         self.get_contact()
         print '[INFO] Get %d contacts' % len(self.contact_list)
+        threading.Thread(target=self.proc_msg).start()
         print '[INFO] Start to process messages .'
-        self.proc_msg()
 
     def get_uuid(self):
         url = 'https://login.weixin.qq.com/jslogin'
